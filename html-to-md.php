@@ -44,3 +44,15 @@ add_filter( 'wp_template_enhancement_output_buffer', function ( $output, $origin
 
 	return html_to_md( $output );
 }, 1000, 2 );
+
+add_action(
+	'wp_head',
+	function () {
+		printf(
+			'<link rel="alternate" type="text/markdown" title="%s" href="%s">' . "\n",
+			'Markdown format',
+			esc_url( add_query_arg( 'output_format', 'md' ) ),
+		);
+	},
+	2 // To be output with feed_links().
+);
