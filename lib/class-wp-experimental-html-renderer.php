@@ -430,7 +430,16 @@ class WP_Experimental_HTML_Renderer {
 			$this->enter_block( $paragraph );
 			$this->flush_block();
 		}
-		$this->line_buffer = new WP_Experimental_HTML_Renderer_Line_Buffer();
+
+		/*
+		 * Only create a new line buffer if the current one has no open formats.
+		 * If there are open formats but no content, we should keep the buffer
+		 * so that the formats can be properly released later when the closing
+		 * tags are encountered.
+		 */
+		if ( ! $this->line_buffer->has_open_formats() ) {
+			$this->line_buffer = new WP_Experimental_HTML_Renderer_Line_Buffer();
+		}
 	}
 
 	private function skip_hidden_content( $p ) {

@@ -269,4 +269,8 @@ class WP_Experimental_HTML_Renderer_Line_Buffer {
 
 		return false;
 	}
+
+	public function has_open_formats(): bool {
+		return count( $this->open_formats ) > 0;
+	}
 }
