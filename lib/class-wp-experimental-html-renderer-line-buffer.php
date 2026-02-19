@@ -270,6 +270,16 @@ class WP_Experimental_HTML_Renderer_Line_Buffer {
 		return false;
 	}
 
+	/**
+	 * Checks if there are any formats that have been opened but not yet closed.
+	 *
+	 * This is useful for determining whether a line buffer should be preserved
+	 * when entering a new block context. If there are open formats, the buffer
+	 * should be kept so that the formats can be properly closed when their
+	 * closing tags are encountered.
+	 *
+	 * @return bool True if there are open formats, false otherwise.
+	 */
 	public function has_open_formats(): bool {
 		return ! empty( $this->open_formats );
 	}
