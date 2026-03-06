@@ -119,7 +119,7 @@ add_action(
 		printf(
 			'<link rel="alternate" type="text/markdown" title="%s" href="%s">' . "\n",
 			'Markdown format',
-			esc_url( add_query_arg( 'output_format', 'md' ) ),
+			esc_url( add_query_arg( 'output_format', 'md', home_url( '/' ) . ltrim( $_SERVER['REQUEST_URI'], '/' ) ) )
 		);
 	},
 	2 // To be output with feed_links().
