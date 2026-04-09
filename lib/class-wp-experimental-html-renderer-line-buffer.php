@@ -76,7 +76,7 @@ class WP_Experimental_HTML_Renderer_Line_Buffer {
 		 * Sometimes, the line buffer has been replaced by the time that the
 		 * format is released. What could cause this to happen?
 		 */
-//		assert( count( $this->open_formats ) > 0 );
+		assert( count( $this->open_formats ) > 0 );
 		$this->format_indices[] = \array_pop( $this->open_formats );
 	}
 
