@@ -12,6 +12,7 @@
  */
 
 use WordPress\Experiments\HtmlToMarkdown\WP_Experimental_HTML_Renderer_Options;
+use function WordPress\Experiments\HtmlToMarkdown\render_yaml;
 
 // Don’t load directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -20,6 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once __DIR__ . '/wp-experimental-html-renderer-loader.php';
 require_once __DIR__ . '/wp-html-to-markdown.php';
+require_once __DIR__ . '/wp-yaml-emitter.php';
 
 add_filter( 'html_to_markdown_starting_node_finder', fn ( $prev ) =>
 	$prev ?? function ( $p ) {
@@ -58,41 +60,48 @@ add_action( 'init', function () {
 				header( 'Vary: Accept' );
 			}
 
-			$title        = '';
-			$author       = '';
-			$published_on = '';
-			$modified_on  = '';
-			if ( is_singular() ) {
-				$title        = get_the_title();
-				$published_on = get_the_date();
-				$modified_on  = get_the_modified_date();
+			$post   = is_singular() ? get_post() : null;
+			$fields = array();
 
-				if ( post_type_supports( get_post()->post_type ?? '', 'author' ) ) {
-					$author = get_the_author_meta( 'display_name' );
+			if ( $post ) {
+				$fields['title']         = get_the_title();
+				$fields['published']     = get_the_date( 'Y-m-d' );
+				$fields['last_modified'] = get_the_modified_date( 'Y-m-d' );
+
+				if ( post_type_supports( $post->post_type, 'author' ) ) {
+					$fields['author'] = get_the_author_meta( 'display_name' );
+				}
+
+				if ( $fields['last_modified'] === $fields['published'] ) {
+					unset( $fields['last_modified'] );
 				}
 			} else {
 				$title_finder = new WP_HTML_Tag_Processor( $output );
 				if ( $title_finder->next_tag( 'title' ) ) {
-					$title = $title_finder->get_modifiable_text();
+					$fields['title'] = $title_finder->get_modifiable_text();
 				}
 			}
 
-			$frontmatter = '';
-			if ( ! empty( $title ) ) {
-				$frontmatter .= "Title: {$title}\n";
-			}
-			if ( ! empty( $author ) ) {
-				$frontmatter .= "Author: {$author}\n";
-			}
-			if ( ! empty( $published_on ) ) {
-				$frontmatter .= "Published: {$published_on}\n";
-			}
-			if ( ! empty( $modified_on ) && $modified_on !== $published_on ) {
-				$frontmatter .= "Last modified: {$modified_on}\n";
-			}
-			if ( ! empty( $frontmatter ) ) {
-				$frontmatter .= "\n---\n\n";
-			}
+			// Drop the plugin's empty defaults so consumers see only fields with values.
+			$fields = array_filter( $fields, static fn ( $v ) => '' !== $v );
+
+			/**
+			 * Filters the YAML frontmatter fields emitted before the markdown body.
+			 *
+			 * Keys become YAML keys. Values may be strings, ints, floats, bools, null,
+			 * or nested arrays (which render as block sequences/mappings). Empty
+			 * strings and arrays whose contents all drop out are omitted. Return an
+			 * empty array to suppress the frontmatter block entirely.
+			 *
+			 * @param array        $fields Associative array of YAML key => value.
+			 * @param WP_Post|null $post   Current post on singular requests, otherwise null.
+			 */
+			$fields = (array) apply_filters( 'html_to_markdown_frontmatter_fields', $fields, $post );
+
+			$frontmatter_body = render_yaml( $fields );
+			$frontmatter      = '' === $frontmatter_body
+				? ''
+				: "---\n{$frontmatter_body}---\n\n";
 
 			$options           = new WP_Experimental_HTML_Renderer_Options();
 			$options->base_url = rtrim( home_url( '/' ), '/' ) . $_SERVER['REQUEST_URI'];
