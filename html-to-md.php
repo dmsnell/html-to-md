@@ -58,41 +58,48 @@ add_action( 'init', function () {
 				header( 'Vary: Accept' );
 			}
 
-			$title        = '';
-			$author       = '';
-			$published_on = '';
-			$modified_on  = '';
-			if ( is_singular() ) {
-				$title        = get_the_title();
-				$published_on = get_the_date();
-				$modified_on  = get_the_modified_date();
+			$post   = is_singular() ? get_post() : null;
+			$fields = array();
 
-				if ( post_type_supports( get_post()->post_type ?? '', 'author' ) ) {
-					$author = get_the_author_meta( 'display_name' );
+			if ( $post ) {
+				$fields['title']         = get_the_title();
+				$fields['published']     = get_the_date( 'Y-m-d' );
+				$fields['last_modified'] = get_the_modified_date( 'Y-m-d' );
+
+				if ( post_type_supports( $post->post_type, 'author' ) ) {
+					$fields['author'] = get_the_author_meta( 'display_name' );
+				}
+
+				if ( $fields['last_modified'] === $fields['published'] ) {
+					unset( $fields['last_modified'] );
 				}
 			} else {
 				$title_finder = new WP_HTML_Tag_Processor( $output );
 				if ( $title_finder->next_tag( 'title' ) ) {
-					$title = $title_finder->get_modifiable_text();
+					$fields['title'] = $title_finder->get_modifiable_text();
 				}
 			}
 
-			$frontmatter = '';
-			if ( ! empty( $title ) ) {
-				$frontmatter .= "Title: {$title}\n";
-			}
-			if ( ! empty( $author ) ) {
-				$frontmatter .= "Author: {$author}\n";
-			}
-			if ( ! empty( $published_on ) ) {
-				$frontmatter .= "Published: {$published_on}\n";
-			}
-			if ( ! empty( $modified_on ) && $modified_on !== $published_on ) {
-				$frontmatter .= "Last modified: {$modified_on}\n";
-			}
-			if ( ! empty( $frontmatter ) ) {
-				$frontmatter .= "\n---\n\n";
-			}
+			// Drop the plugin's empty defaults so consumers see only fields with values.
+			$fields = array_filter( $fields, static fn ( $v ) => '' !== $v );
+
+			/**
+			 * Filters the YAML frontmatter fields emitted before the markdown body.
+			 *
+			 * Keys become YAML keys. Values may be strings, ints, floats, bools, null,
+			 * or nested arrays (which render as block sequences/mappings). Empty
+			 * strings and arrays whose contents all drop out are omitted. Return an
+			 * empty array to suppress the frontmatter block entirely.
+			 *
+			 * @param array        $fields Associative array of YAML key => value.
+			 * @param WP_Post|null $post   Current post on singular requests, otherwise null.
+			 */
+			$fields = (array) apply_filters( 'html_to_markdown_frontmatter_fields', $fields, $post );
+
+			$frontmatter_body = wp_html_to_markdown_render_yaml( $fields );
+			$frontmatter     = '' === $frontmatter_body
+				? ''
+				: "---\n{$frontmatter_body}---\n\n";
 
 			$options           = new WP_Experimental_HTML_Renderer_Options();
 			$options->base_url = rtrim( home_url( '/' ), '/' ) . $_SERVER['REQUEST_URI'];
@@ -130,3 +137,102 @@ add_action(
 	},
 	2 // To be output with feed_links().
 );
+
+/**
+ * Renders a PHP array as a YAML mapping or sequence body.
+ *
+ * Accepts string, int, float, bool, null, and nested arrays. Empty strings and
+ * arrays whose contents all filter out are dropped. Unsupported leaf types
+ * (objects, resources, etc.) trigger _doing_it_wrong() and are skipped.
+ *
+ * Output is the inner body only — callers wrap it in `---` document markers
+ * if they need a frontmatter block.
+ */
+function wp_html_to_markdown_render_yaml( array $value, int $indent = 0 ): string {
+	$pad     = str_repeat( '  ', $indent );
+	$is_list = array_is_list( $value );
+	$out     = '';
+
+	foreach ( $value as $key => $v ) {
+		if ( is_array( $v ) ) {
+			$rendered = wp_html_to_markdown_render_yaml( $v, $indent + 1 );
+			if ( '' === $rendered ) {
+				continue;
+			}
+		} elseif ( wp_html_to_markdown_is_yaml_scalar( $v ) ) {
+			if ( is_string( $v ) && '' === $v ) {
+				continue;
+			}
+			$rendered = wp_html_to_markdown_render_yaml_scalar( $v );
+		} else {
+			_doing_it_wrong(
+				'apply_filters( "html_to_markdown_frontmatter_fields" )',
+				sprintf( 'Unsupported value type in YAML frontmatter: %s', esc_html( gettype( $v ) ) ),
+				'2026.02.18'
+			);
+			continue;
+		}
+
+		if ( $is_list ) {
+			$out .= is_array( $v )
+				? "{$pad}-\n{$rendered}"
+				: "{$pad}- {$rendered}\n";
+		} else {
+			$key_str = wp_html_to_markdown_render_yaml_key( (string) $key );
+			$out    .= is_array( $v )
+				? "{$pad}{$key_str}:\n{$rendered}"
+				: "{$pad}{$key_str}: {$rendered}\n";
+		}
+	}
+
+	return $out;
+}
+
+function wp_html_to_markdown_is_yaml_scalar( $v ): bool {
+	return is_string( $v ) || is_int( $v ) || is_float( $v ) || is_bool( $v ) || null === $v;
+}
+
+function wp_html_to_markdown_render_yaml_scalar( $v ): string {
+	if ( is_string( $v ) ) {
+		$escaped = str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), $v );
+		$escaped = str_replace( array( "\r\n", "\r", "\n" ), ' ', $escaped );
+		return "\"{$escaped}\"";
+	}
+	if ( is_bool( $v ) ) {
+		return $v ? 'true' : 'false';
+	}
+	if ( null === $v ) {
+		return 'null';
+	}
+	if ( is_float( $v ) ) {
+		if ( is_nan( $v ) ) {
+			return '.nan';
+		}
+		if ( is_infinite( $v ) ) {
+			return $v > 0 ? '.inf' : '-.inf';
+		}
+	}
+	return (string) $v;
+}
+
+function wp_html_to_markdown_render_yaml_key( string $key ): string {
+	// Quote when the key would otherwise be misparsed: empty, leading indicator
+	// character, embedded `: ` or `# `, trailing whitespace, numeric-looking, or
+	// matching a YAML 1.1 boolean/null literal.
+	$needs_quoting = (
+		'' === $key
+		|| 1 === preg_match( '/^[\s\-?:,\[\]\{\}#&*!|>\'"%@`]/', $key )
+		|| 1 === preg_match( '/[:#]\s/', $key )
+		|| 1 === preg_match( '/\s$/', $key )
+		|| is_numeric( $key )
+		|| in_array( strtolower( $key ), array( 'true', 'false', 'null', 'yes', 'no', 'on', 'off', '~' ), true )
+	);
+
+	if ( ! $needs_quoting ) {
+		return $key;
+	}
+
+	$escaped = str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), $key );
+	$escaped = str_replace( array( "\r\n", "\r", "\n" ), ' ', $escaped );
+	return "\"{$escaped}\"";
+}
