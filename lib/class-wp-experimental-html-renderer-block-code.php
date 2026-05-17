@@ -87,9 +87,6 @@ class WP_Experimental_HTML_Renderer_Block_Code extends WP_Experimental_HTML_Rend
 			return '';
 		}
 
-		$previous_indent = $options->indent;
-		$options->indent[] = '    ';
-
 		$slug                    = $this->language ?? $this->language_fallback ?? '';
 		$indent                  = \implode( '', $options->indent );
 		$indent_length           = \mb_strwidth( $indent );
@@ -107,7 +104,6 @@ class WP_Experimental_HTML_Renderer_Block_Code extends WP_Experimental_HTML_Rend
 		$suffix = "\n{$indent}```\n";
 
 		$options->soft_line_wrap = $soft_limit;
-		$options->indent         = $previous_indent;
 		return "{$prefix}{$buffer}{$suffix}";
 	}
 
