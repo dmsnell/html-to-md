@@ -2,6 +2,15 @@
 
 namespace WordPress\Experiments\HtmlToMarkdown;
 
+/**
+ * Strip the invisible nobr markers Line_Buffer emits around links. line_wrap()
+ * consumes them and removes them in passing; consumers that don't wrap (headings,
+ * table cells) call this instead so the markers don't leak into the output.
+ */
+function strip_nobr_markers( string $text ): string {
+	return \str_replace( array( "\u{E0001}", "\u{E007F}" ), '', $text );
+}
+
 function line_wrap( string $text, int $soft_limit ): array {
 	/** Tune to better align the ending edge of wrapped lines. */
 	$fractional_soft_limit_ratio = 0.4;
