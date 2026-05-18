@@ -36,10 +36,7 @@ class WP_Experimental_HTML_Renderer_Block_Table_Cell extends WP_Experimental_HTM
 	public function flush( WP_Experimental_HTML_Renderer_Options $options ): string {
 		$parts = array();
 		foreach ( $this->children as $child ) {
-			$rendered = $child instanceof WP_Experimental_HTML_Renderer_Block
-				? $child->flush( $options )
-				: $child->flush( $options );
-			$rendered = \trim( $rendered );
+			$rendered = \trim( $child->flush( $options ) );
 			if ( '' !== $rendered ) {
 				$parts[] = $rendered;
 			}
