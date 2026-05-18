@@ -1,0 +1,60 @@
+<section id="table with thead emits separator row">
+<pre>
+<table>
+<thead><tr><th>Group</th><th>Speed</th></tr></thead>
+<tbody>
+<tr><td>Control</td><td>1.0</td></tr>
+<tr><td>Test</td><td>1.6</td></tr>
+</tbody>
+</table>
+</pre>
+<script type="text/x-markdown">
+| Group | Speed |
+| --- | --- |
+| Control | 1.0 |
+| Test | 1.6 |</script>
+</section>
+
+<section id="table whose first row is all th treats it as header">
+<pre>
+<table>
+<tr><th>Name</th><th>Value</th></tr>
+<tr><td>Alpha</td><td>1</td></tr>
+</table>
+</pre>
+<script type="text/x-markdown">
+| Name | Value |
+| --- | --- |
+| Alpha | 1 |</script>
+</section>
+
+<section id="table cell with paragraph child flattens to inline text">
+<pre>
+<table>
+<thead><tr><th>Func</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td>wp_roles()</td>
+<td><p>Retrieves the global roles instance.</p></td>
+</tr>
+</tbody>
+</table>
+</pre>
+<script type="text/x-markdown">
+| Func | Description |
+| --- | --- |
+| wp_roles() | Retrieves the global roles instance. |</script>
+</section>
+
+<section id="table cell pipe character is escaped">
+<pre>
+<table>
+<thead><tr><th>Token</th></tr></thead>
+<tbody><tr><td>a|b</td></tr></tbody>
+</table>
+</pre>
+<script type="text/x-markdown">
+| Token |
+| --- |
+| a\|b |</script>
+</section>

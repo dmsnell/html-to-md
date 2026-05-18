@@ -50,7 +50,9 @@ class WP_Experimental_HTML_Renderer_Block_List extends WP_Experimental_HTML_Rend
 					$spacing     = \str_repeat( ' ', $longest_prefix - \strlen( $item_number ) );
 					$buffer     .= "{$indent} {$item_number}.{$spacing} {$line}\n";
 				} else {
-					$buffer .= "{$indent} {$spacerN}  {$line}\n";
+					$buffer .= '' === $line
+						? "\n"
+						: "{$indent} {$spacerN}  {$line}\n";
 				}
 			}
 
@@ -81,6 +83,8 @@ class WP_Experimental_HTML_Renderer_Block_List extends WP_Experimental_HTML_Rend
 			foreach ( \explode( "\n", $item->flush( $options ) ) as $i => $line ) {
 				if ( 0 === $i && $is_sublist && ! $was_sublist ) {
 					$buffer .= "{$prefixN}{$line}\n";
+				} elseif ( 0 !== $i && '' === $line ) {
+					$buffer .= "\n";
 				} else {
 					$buffer .= $i === 0 ? "{$prefix1}{$line}\n" : "{$prefixN}{$line}\n";
 				}

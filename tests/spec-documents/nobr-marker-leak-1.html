@@ -1,0 +1,24 @@
+<section id="link in heading does not leak nobr markers">
+<pre><h2>See <a href="https://example.com">the spec</a> please</h2></pre>
+<script type="text/x-markdown">
+## See [the spec](https://example.com) please
+</script>
+</section>
+
+<section id="link in table cell does not leak nobr markers">
+<pre>
+<table>
+<thead><tr><th>Version</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><a href="https://example.com/6.9.0/">6.9.0</a></td>
+<td>Support added.</td>
+</tr>
+</tbody>
+</table>
+</pre>
+<script type="text/x-markdown">
+| Version | Description |
+| --- | --- |
+| [6.9.0](https://example.com/6.9.0/) | Support added. |</script>
+</section>

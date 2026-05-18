@@ -233,8 +233,16 @@ class WP_Experimental_HTML_Renderer {
 
 				case 'LI':
 					$this->close_a_paragraph();
-					if ( ! ( $is_closer || $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_List ) ) {
-						$this->enter_block( new WP_Experimental_HTML_Renderer_Block_List( '' ) );
+					if ( $is_closer ) {
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_ListItem ) {
+							$this->flush_block();
+						}
+					} else {
+						// Tolerate stray <li> by synthesizing a list around it.
+						if ( ! ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_List ) ) {
+							$this->enter_block( new WP_Experimental_HTML_Renderer_Block_List( '' ) );
+						}
+						$this->enter_block( new WP_Experimental_HTML_Renderer_Block_ListItem() );
 					}
 					break;
 
@@ -283,15 +291,10 @@ class WP_Experimental_HTML_Renderer {
 					$this->close_a_paragraph();
 
 					if ( $is_closer ) {
-						if ( $this->line_buffer->has_non_whitespace_content() ) {
-							if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_List ) {
-								$item = new WP_Experimental_HTML_Renderer_Block_Paragraph();
-								$item->append_line( $this->line_buffer );
-							} else {
-								$item = $this->close_innermost_block();
-							}
-
-							$this->innermost_block()->append( $item );
+						// An implicit <li> may still be open (HTML parser auto-closes when </ul>
+						// arrives). Flush it before flushing the list itself.
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_ListItem ) {
+							$this->flush_block();
 						}
 
 						$this->line_buffer = new WP_Experimental_HTML_Renderer_Line_Buffer();
@@ -345,31 +348,63 @@ class WP_Experimental_HTML_Renderer {
 					$this->depths[ $token_name ] += $is_closer ? -1 : 1;
 					break;
 
-				/*
-				 * Tables deserve their own block type which maintains
-				 * consistent widths for the cells, handles colspan
-				 * widths, rowspan, etc. This gets very complicated so
-				 * the current implementation does little more than to
-				 * draw borders around the cells so they are visually
-				 * separated.
-				 */
 				case 'TABLE':
 					$this->close_a_paragraph();
 					$this->options->soft_line_wrap = $is_closer ? $soft_limit : PHP_INT_MAX;
+					if ( $is_closer ) {
+						// Close any still-open cell/row (HTML parser may have left implicit closures).
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table_Cell ) {
+							$this->flush_block();
+						}
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table_Row ) {
+							$this->flush_block();
+						}
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table ) {
+							$this->flush_block();
+						}
+					} else {
+						$this->enter_block( new WP_Experimental_HTML_Renderer_Block_Table() );
+					}
+					break;
+
+				case 'THEAD':
+					$this->close_a_paragraph();
+					if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table ) {
+						$is_closer
+							? $this->innermost_block()->end_thead()
+							: $this->innermost_block()->begin_thead();
+					}
+					break;
+
+				case 'TBODY':
+				case 'TFOOT':
+					$this->close_a_paragraph();
+					// No structural significance for the current emitter; rows are flat.
+					break;
+
+				case 'TR':
+					$this->close_a_paragraph();
+					if ( $is_closer ) {
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table_Cell ) {
+							$this->flush_block();
+						}
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table_Row ) {
+							$this->flush_block();
+						}
+					} elseif ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table ) {
+						$this->enter_block( new WP_Experimental_HTML_Renderer_Block_Table_Row() );
+					}
 					break;
 
 				case 'TD':
 				case 'TH':
+					$this->close_a_paragraph();
 					if ( $is_closer ) {
-						$this->line_buffer->append_text( ' | ' );
-					}
-					break;
-
-				case 'TR':
-					if ( $is_closer ) {
-						$this->line_buffer->append_text( "\n" );
-					} else {
-						$this->line_buffer->append_text( '| ' );
+						if ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table_Cell ) {
+							$this->flush_block();
+						}
+					} elseif ( $this->innermost_block() instanceof WP_Experimental_HTML_Renderer_Block_Table_Row ) {
+						$this->enter_block( new WP_Experimental_HTML_Renderer_Block_Table_Cell( 'TH' === $token_name ) );
 					}
 					break;
 			}
