@@ -215,8 +215,8 @@ class WP_Experimental_HTML_Renderer_Line_Buffer {
 					'' === \trim( $this->buffer, " \r\t\f\n" )
 				) {
 					return '' !== $format->title
-						? "![{$format->alt_text}]({$format->src_url} \"{$format->title}\")"
-						: "![{$format->alt_text}]({$format->src_url})";
+						? "\u{E0001}![{$format->alt_text}]({$format->src_url} \"{$format->title}\")\u{E007F}"
+						: "\u{E0001}![{$format->alt_text}]({$format->src_url})\u{E007F}";
 				}
 
 				if ( '' === $format->alt_text || 'exiting' === $state ) {
